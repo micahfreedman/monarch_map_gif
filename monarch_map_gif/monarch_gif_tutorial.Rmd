@@ -1,0 +1,137 @@
+---
+title: "Monarch occurrence .gif tutorial"
+author: "Micah Freedman"
+date: "7/30/2019"
+output: html_document
+---
+
+##This is a quick tutorial on how to make an animated map of monarch butterfly occurrence data over the course of a year in North America. It uses data from iNaturalist (https://www.inaturalist.org/home) and is based on another tutorial from DataNovia (https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/). 
+
+###Begin by downloading observations from iNaturalist. Use this link: https://www.inaturalist.org/observations/export. For this demonstration, I specified only observations from North America and entered "Danaus plexippus" in the "Taxon" search field. Besides that, I left all of the default options. This dataset contains about 50,000 observations and took about 10 minutes to compile and download. Once it's ready, you will be directed to a link that has a zipped folder which contains a .csv file that has all of the data. The .csv file should have a name like "observations-59866.csv".
+
+###Establish directory (put the downloaded .csv file here; all outputs will also go here)
+
+```{r setup}
+knitr::opts_knit$set(root.dir = '../monarch_map_gif/')
+```
+
+###Load necessary libraries; if you don't have these installed yet, you'll have to do that first using install.packages('name_of_package')
+
+```{r}
+
+library(ggplot2); library(plyr); library(rnaturalearth); library(gganimate); library(gapminder); library(gifski)
+
+```
+
+###Load the data and take a look. This could take a little while, depending on the size of the file.
+
+```{r}
+
+inat.monarchs <- read.csv(file = './observations-59866.csv')
+
+head(inat.monarchs)
+
+names(inat.monarchs)
+
+```
+
+###Filter out captive reared and non-research-grade observations.
+
+```{r}
+
+inat.monarchs <- inat.monarchs[inat.monarchs$captive_cultivated=='false',]
+
+inat.monarchs <- inat.monarchs[inat.monarchs$quality_grade == 'research',]
+
+```
+
+###Pick which columns to keep
+
+```{r}
+
+columns.keep <- c('id','observed_on','quality_grade','place_guess','latitude','longitude','url')
+
+inat.monarchs <- inat.monarchs[,columns.keep]
+
+```
+
+###Get date information into the proper format
+
+```{r}
+
+inat.monarchs$julian.date <- format(as.Date(inat.monarchs$observed_on), "%j") #create a new column for Julian day of observation
+
+inat.monarchs$julian.date <- as.numeric(inat.monarchs$julian.date) #convert this to a continuous numeric variable
+
+inat.monarchs$month <- format(as.Date(inat.monarchs$observed_on), "%m")
+
+inat.monarchs$month <- revalue(inat.monarchs$month, c('01' = 'January', '02' = 'February', '03' = 'March', '04' = 'April', '05' = 'May', '06' = 'June', '07' = 'July', '08' = 'August', '09' = 'September', '10' = 'October', '11' = 'November', '12' = 'December')) #assign names for months (revalue function requires plyr library)
+
+inat.monarchs$month <- factor(inat.monarchs$month, levels = c('January','February','March','April','May','June','July','August','September','October','November','December')) #rearrange so months are in chronological order
+
+```
+
+###Specify observations to exclude. These are some observations that, despite being research grade, are not relevant, such as dead monarchs found in melted snow. I've almost certainly missed a few; this list can be updated.
+
+```{r}
+urls.exclude <- c('https://www.inaturalist.org/observations/9373451','https://www.inaturalist.org/observations/20483568','https://www.inaturalist.org/observations/9879408','https://www.inaturalist.org/observations/20320860','https://www.inaturalist.org/observations/21799902','https://www.inaturalist.org/observations/19494799','https://www.inaturalist.org/observations/11410855','https://www.inaturalist.org/observations/5740325','https://www.inaturalist.org/observations/7469853','https://www.inaturalist.org/observations/18866685','https://www.inaturalist.org/observations/18357363','https://www.inaturalist.org/observations/19379295')
+
+inat.monarchs <- inat.monarchs[-(inat.monarchs$url %in% urls.exclude),] #exclude the above observations
+```
+
+###Plot observations onto a world map. Note: observations here are only from North America, since that is what I specified when I downloaded the data from iNaturalist.
+
+```{r}
+
+world <- ne_countries(scale= 'medium',returnclass = 'sf') #retrieve map layer (uses rnaturalearth package)
+
+ggplot(data = world)+
+  geom_sf()+
+  theme_bw()+
+  geom_point(data = inat.monarchs,  aes(x = longitude, y = latitude), size = 0.5, col = 'blue')+
+  theme(legend.position = 'none')+
+  theme(axis.title = element_blank())
+
+```
+
+###Okay, now it's time to make the actual .gif itself.
+
+###First, we need to define a static plot that contains all of the data.
+
+```{r}
+(plot.static <- ggplot(data = world)+
+  geom_sf()+
+  theme_bw()+
+  theme(axis.title = element_blank(), axis.text = element_blank())+
+  xlim(c(-130,-60))+
+  ylim(c(12,60))+
+  theme(legend.position = 'none')+
+  geom_point(data = inat.monarchs, 
+             aes(x = longitude, y = latitude, col = julian.date), size = 1)+
+  scale_color_viridis_c())
+```
+
+###Now use this map template to generate an animated .gif
+####Arguments and what they do:
+####transition_time() specifies what to use for indexing / what order to put plots in
+####shadow_wake() will leave a "trail" or "imprint" behind after each point appears, with the time that it remains visible defined by the wake_length argument
+####shadow_mark() will leave a permanent mark after a point appear.
+
+```{r}
+monarchs.anim <- plot.static + transition_time(julian.date) +
+  shadow_wake(wake_length = 0.5, alpha = FALSE)+
+  shadow_mark(alpha = 0.4, size = 0.6)
+```
+
+###Display the .gif!!!
+
+```{r}
+monarchs.anim
+```
+
+###Export the file in .gif format
+
+```{r}
+anim_save("../monarchs.gif", monarchs.anim, height = 8, width = 8, units = "in", res = 300)
+```
+
