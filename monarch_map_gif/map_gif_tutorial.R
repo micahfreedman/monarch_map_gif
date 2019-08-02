@@ -2,11 +2,11 @@
 
 #load libraries
 
-library(ggplot2); library(plyr); library(rnaturalearth); library(gganimate); library(gapminder); library(gifski)
+library(ggplot2); library(plyr); library(rnaturalearth); library(gganimate); library(gapminder); library(gifski); library(ggmap)
 
 #download data
 
-inat.monarchs <- read.csv(file = '~/Downloads/observations-59866.csv')
+inat.monarchs <- read.csv(file = './observations-59866.csv')
 
 head(inat.monarchs) #view data
 
@@ -26,7 +26,7 @@ inat.monarchs$julian.date <- as.numeric(inat.monarchs$julian.date) #convert this
 
 inat.monarchs$month <- format(as.Date(inat.monarchs$observed_on), "%m")
 
-inat.monarchs$month <- revalue(inat.monarchs$month, c('01' = 'January', '02' = 'February', '03' = 'March', '04' = 'April', '05' = 'May', '06' = 'June', '07' = 'July', '08' = 'August', '09' = 'September', '10' = 'October', '11' = 'November', '12' = 'December')) #assign names for months (revalue function requires plyr library)
+inat.monarchs$month <- month.name[as.numeric(inat.monarchs$month)] #convert 
 
 inat.monarchs$month <- factor(inat.monarchs$month, levels = c('January','February','March','April','May','June','July','August','September','October','November','December')) #rearrange so months are in chronological order
 
@@ -68,9 +68,11 @@ ggmap(nMap)+
              aes(x = longitude, y = latitude, col = julian.date), size = 1)+
   scale_color_viridis_c())
 
-monarchs.anim <- plot.static + transition_time(julian.date) +
+monarchs.anim <- plot.static + transition_time(julian.date) + 
   shadow_wake(wake_length = 0.5, alpha = FALSE)+
   shadow_mark(alpha = 0.4, size = 0.6)
+
+#important: the transition_time argument can only process numeric variables
 
 #transition_time argument specifies that we want to advance based on Julian day. By default, this seems to default to a max of 100 frames per .gif.
 #shadow_wake argument leaves an "imprint" or "shadow" behind after points originally appear
@@ -78,12 +80,27 @@ monarchs.anim <- plot.static + transition_time(julian.date) +
 
 monarchs.anim #display the .gif
 
-anim_save("~/Desktop/monarchs.gif", range.xp.anim) #export
+anim_save("~./monarchs.gif", monarchs.anim, height = 6, width = 6, units = "in", res = 240) #export
 
 
+### alternative -- plot the data according to the month of their occurrence; this time include a legend for month
 
+(plot.static.month <- ggplot(data = world)+
+    geom_sf()+
+    theme_bw()+
+    theme(axis.title = element_blank(), axis.text = element_blank())+
+    xlim(c(-130,-60))+
+    ylim(c(12,60))+
+    geom_point(data = inat.monarchs, 
+               aes(x = longitude, y = latitude, col = month), size = 1)+
+    scale_color_viridis_d()) #same code as before, but with col = month and scale_color_viridis changed to discrete rather than continuous
 
-
+monarchs.anim.month <- plot.static.month + transition_time(as.integer(month)) +
+  shadow_wake(wake_length = 0.5, alpha = FALSE)+
+  shadow_mark(alpha = 0.4, size = 0.6)+
+  labs(title = 'Month: {frame_time}')
+  
+monarchs.anim.month
 
 
 

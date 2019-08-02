@@ -59,13 +59,13 @@ inat.monarchs <- inat.monarchs[,columns.keep]
 
 ```{r}
 
-inat.monarchs$julian.date <- format(as.Date(inat.monarchs$observed_on), "%j") #create a new column for Julian day of observation
+inat.monarchs$julian.date <- format(as.Date(inat.monarchs$observed_on), "%j") #create a new column for Julian date of observation
 
 inat.monarchs$julian.date <- as.numeric(inat.monarchs$julian.date) #convert this to a continuous numeric variable
 
 inat.monarchs$month <- format(as.Date(inat.monarchs$observed_on), "%m")
 
-inat.monarchs$month <- revalue(inat.monarchs$month, c('01' = 'January', '02' = 'February', '03' = 'March', '04' = 'April', '05' = 'May', '06' = 'June', '07' = 'July', '08' = 'August', '09' = 'September', '10' = 'October', '11' = 'November', '12' = 'December')) #assign names for months (revalue function requires plyr library)
+inat.monarchs$month <- month.name[as.numeric(inat.monarchs$month)] #convert 
 
 inat.monarchs$month <- factor(inat.monarchs$month, levels = c('January','February','March','April','May','June','July','August','September','October','November','December')) #rearrange so months are in chronological order
 
@@ -133,5 +133,28 @@ monarchs.anim
 
 ```{r}
 anim_save("../monarchs.gif", monarchs.anim, height = 8, width = 8, units = "in", res = 300)
+```
+
+###Make another plot, but this time plotting data according to their month of occurrence rather than Julian day
+
+```{r}
+
+(plot.static.month <- ggplot(data = world)+
+    geom_sf()+
+    theme_bw()+
+    theme(axis.title = element_blank(), axis.text = element_blank())+
+    xlim(c(-130,-60))+
+    ylim(c(12,60))+
+    geom_point(data = inat.monarchs, 
+               aes(x = longitude, y = latitude, col = month), size = 1)+
+    scale_color_viridis_d()) #same code as before, but with col = month and scale_color_viridis changed to discrete rather than continuous
+
+monarchs.anim.month <- plot.static.month + transition_time(as.integer(month)) +
+  shadow_wake(wake_length = 0.5, alpha = FALSE)+
+  shadow_mark(alpha = 0.4, size = 0.6)+
+  labs(title = 'Month: {frame_time}') #this line will add a title that shows Month: 1, Month: 2, etc.
+  
+monarchs.anim.month
+
 ```
 
